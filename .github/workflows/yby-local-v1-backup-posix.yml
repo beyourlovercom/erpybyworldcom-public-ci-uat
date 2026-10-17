@@ -1,0 +1,46 @@
+name: YBY Local V1 Backup POSIX Gate
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/Modules/Backup/**'
+      - 'tests/Unit/Backup/**'
+      - 'tests/Feature/Backup/**'
+      - '.github/workflows/yby-local-v1-backup-posix.yml'
+permissions:
+  contents: read
+jobs:
+  backup-posix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, sqlite3
+          coverage: none
+      - name: Install backup fixture tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y zstd
+          sudo mkdir -p /private/tmp /opt/homebrew/bin
+          sudo ln -s "$(command -v zstd)" /opt/homebrew/bin/zstd
+          sudo chmod 1777 /private/tmp
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build frontend assets for Inertia page tests
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Map Inertia pages for Linux case-sensitive filesystem
+        run: ln -s Pages resources/js/pages
+      - name: Run full Backup unit and feature suite
+        run: vendor/bin/phpunit tests/Unit/Backup tests/Feature/Backup --no-progress
+      - name: PR diff whitespace check
+        run: git diff --check HEAD^ HEAD

@@ -1,0 +1,53 @@
+<?php
+
+use App\Modules\Logistics\Experience\Controllers\CarrierController;
+use App\Modules\Logistics\Experience\Controllers\HistoricalImportController;
+use App\Modules\Logistics\Experience\Controllers\LogisticsController;
+use App\Modules\Logistics\Experience\Controllers\OverseaWarehouseController;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['web', 'auth'])->group(function (): void {
+    Route::get('/logistics', [LogisticsController::class, 'index'])->middleware('can:logistics.view')->name('shell.logistics');
+    Route::get('/logistics/pending', [LogisticsController::class, 'index'])->middleware('can:logistics.view')->name('logistics.pending');
+    Route::get('/logistics/wait-stock', [LogisticsController::class, 'waitStock'])->middleware('can:logistics.view')->name('logistics.wait-stock');
+    Route::get('/logistics/oversea/{warehouse?}', [OverseaWarehouseController::class, 'index'])->middleware('can:logistics.view')->where('warehouse', 'us-ny|us-moreplus|us-3sm|us-sm|us-sj|usa-sj|de-tianyun|ca')->name('logistics.oversea');
+    Route::get('/logistics/oversea/{warehouse}/export', [OverseaWarehouseController::class, 'export'])->middleware('can:logistics.view')->where('warehouse', 'us-ny|us-moreplus|us-3sm|us-sm|us-sj|usa-sj|de-tianyun|ca')->name('logistics.oversea.export');
+    Route::post('/logistics/oversea/{warehouse}/tracking-import/preview', [OverseaWarehouseController::class, 'previewTrackingReturn'])->middleware('can:logistics.operate')->where('warehouse', 'us-ny|us-moreplus|us-3sm|us-sm|us-sj|usa-sj|de-tianyun|ca')->name('logistics.oversea.tracking-import.preview');
+    Route::post('/logistics/oversea/{warehouse}/tracking-import/apply', [OverseaWarehouseController::class, 'applyTrackingReturn'])->middleware('can:logistics.operate')->where('warehouse', 'us-ny|us-moreplus|us-3sm|us-sm|us-sj|usa-sj|de-tianyun|ca')->name('logistics.oversea.tracking-import.apply');
+    Route::patch('/logistics/oversea/orders/{order}/draft', [OverseaWarehouseController::class, 'updateDraft'])->middleware('can:logistics.operate')->name('logistics.oversea.draft');
+    Route::post('/logistics/oversea/orders/{order}/approve', [OverseaWarehouseController::class, 'approve'])->middleware('can:logistics.operate')->name('logistics.oversea.approve');
+    Route::post('/logistics/oversea/orders/{order}/reopen-review', [OverseaWarehouseController::class, 'reopenReview'])->middleware('can:logistics.operate')->name('logistics.oversea.reopen-review');
+    Route::post('/logistics/oversea/orders/{order}/reject', [OverseaWarehouseController::class, 'reject'])->middleware('can:logistics.operate')->name('logistics.oversea.reject');
+    Route::get('/logistics/awaiting-tracking', [LogisticsController::class, 'awaitingTracking'])->middleware('can:logistics.view')->name('logistics.awaiting-tracking');
+    Route::get('/logistics/in-transit', [LogisticsController::class, 'inTransit'])->middleware('can:logistics.view')->name('logistics.in-transit');
+    Route::get('/logistics/exceptions', [LogisticsController::class, 'exceptions'])->middleware('can:logistics.view')->name('logistics.exceptions');
+    Route::get('/logistics/review', [LogisticsController::class, 'review'])->middleware('can:logistics.view')->name('logistics.review');
+    Route::get('/logistics/completed', [LogisticsController::class, 'completed'])->middleware('can:logistics.view')->name('logistics.completed');
+    Route::get('/logistics/cancelled', [LogisticsController::class, 'cancelled'])->middleware('can:logistics.view')->name('logistics.cancelled');
+    Route::get('/logistics/carriers', [CarrierController::class, 'index'])->middleware('can:logistics.view')->name('logistics.carriers');
+    Route::post('/logistics/carriers', [CarrierController::class, 'store'])->middleware('can:logistics.operate')->name('logistics.carriers.store');
+    Route::get('/logistics/carriers/{carrier}', [CarrierController::class, 'show'])->middleware('can:logistics.view')->name('logistics.carriers.show');
+    Route::get('/logistics/historical-import', [HistoricalImportController::class, 'index'])->middleware('can:logistics.view')->name('logistics.historical-import');
+    Route::post('/logistics/historical-import/preview', [HistoricalImportController::class, 'preview'])->middleware('can:logistics.operate')->name('logistics.historical-import.preview');
+    Route::post('/logistics/historical-import/{batch}/commit', [HistoricalImportController::class, 'commit'])->middleware('can:logistics.operate')->name('logistics.historical-import.commit');
+    Route::post('/logistics/historical-import/{batch}/review-rescue/commit', [HistoricalImportController::class, 'commitReviewRescue'])->middleware('can:logistics.operate')->name('logistics.historical-import.review-rescue.commit');
+    Route::post('/logistics/historical-import/{batch}/rescue-attempts/preview', [HistoricalImportController::class, 'previewRescueAttempts'])->middleware('can:logistics.operate')->name('logistics.historical-import.rescue-attempts.preview');
+    Route::post('/logistics/historical-import/{batch}/rescue-attempts/{projection}/apply', [HistoricalImportController::class, 'applyRescueAttempts'])->middleware('can:logistics.operate')->whereNumber('projection')->name('logistics.historical-import.rescue-attempts.apply');
+    Route::post('/logistics/orders/{order}/draft', [LogisticsController::class, 'saveDraft'])->middleware('can:logistics.operate')->name('logistics.draft');
+    Route::post('/logistics/orders/{order}/adopt-recommendation', [LogisticsController::class, 'adoptRecommendation'])->middleware('can:logistics.operate')->name('logistics.adopt-recommendation');
+    Route::post('/logistics/orders/{order}/fulfillment-allocation/recommended', [LogisticsController::class, 'submitRecommendedAllocation'])->middleware('can:logistics.operate')->name('logistics.fulfillment-allocation.recommended');
+    Route::post('/logistics/orders/{order}/fulfillment-allocation/manual', [LogisticsController::class, 'submitManualAllocation'])->middleware('can:logistics.operate')->name('logistics.fulfillment-allocation.manual');
+    Route::get('/logistics/orders/{order}/payload', [LogisticsController::class, 'payload'])->middleware('can:logistics.view')->name('logistics.payload');
+    Route::post('/logistics/orders/{order}/ship', [LogisticsController::class, 'markShipped'])->middleware('can:logistics.operate')->name('logistics.ship');
+    Route::post('/logistics/orders/{order}/reopen', [LogisticsController::class, 'reopen'])->middleware('can:logistics.operate')->name('logistics.reopen');
+    Route::post('/logistics/orders/{order}/update-tracking', [LogisticsController::class, 'updateTracking'])->middleware('can:logistics.operate')->name('logistics.update-tracking');
+    Route::post('/logistics/orders/{order}/mark-exception', [LogisticsController::class, 'markException'])->middleware('can:logistics.operate')->name('logistics.mark-exception');
+    Route::post('/logistics/orders/{order}/resolve-exception', [LogisticsController::class, 'resolveException'])->middleware('can:logistics.operate')->name('logistics.resolve-exception');
+    Route::post('/logistics/orders/{order}/review', [LogisticsController::class, 'decideReview'])->middleware('can:logistics.operate')->name('logistics.review.decide');
+    Route::post('/logistics/orders/{order}/pause', [LogisticsController::class, 'pause'])->middleware('can:logistics.operate')->name('logistics.pause');
+    Route::post('/logistics/orders/{order}/redispatch', [LogisticsController::class, 'redispatch'])->middleware('can:logistics.operate')->name('logistics.redispatch');
+    Route::post('/logistics/orders/{order}/reship', [LogisticsController::class, 'reship'])->middleware('can:logistics.operate')->name('logistics.reship');
+    Route::post('/logistics/orders/{order}/contact-user', [LogisticsController::class, 'contactUser'])->middleware('can:logistics.operate')->name('logistics.contact-user');
+    Route::post('/logistics/orders/{order}/cancel-exception', [LogisticsController::class, 'cancelException'])->middleware('can:logistics.operate')->name('logistics.cancel-exception');
+    Route::post('/logistics/orders/{order}/mark-completed', [LogisticsController::class, 'markCompleted'])->middleware('can:logistics.operate')->name('logistics.mark-completed');
+});

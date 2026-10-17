@@ -1,0 +1,1 @@
+<script setup lang="ts">defineProps<{ label:string; tone:'verified'|'pending'|'reviewing' }>()</script><template><span class="customer-os-status-pill" :class="`is-${tone}`">{{ label }}</span></template>
