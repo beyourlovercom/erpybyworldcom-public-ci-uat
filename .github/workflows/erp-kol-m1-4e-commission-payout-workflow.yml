@@ -68,3 +68,5 @@ jobs:
           tests/Feature/Kol/KolReferralCommissionSyncTest.php
           tests/Feature/Kol/HttpAffiliateWpGatewayTest.php
           tests/Feature/Identity/UserManagementTest.php
+
+# Public UAT: trigger existing PR checks only; no deployment.

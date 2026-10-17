@@ -74,3 +74,5 @@ jobs:
           DB_PASSWORD: root
           ERP_LOCAL_ADMIN_BYPASS: 'false'
         run: php artisan test tests/Feature/ProductionStability/MySql8ProductionCompatibilityTest.php
+
+# Public UAT: trigger existing PR checks only; no deployment.

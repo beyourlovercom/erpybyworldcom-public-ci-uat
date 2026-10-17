@@ -78,3 +78,5 @@ jobs:
         run: git diff --check origin/main...HEAD
       - name: Assert no dev hot marker
         run: test ! -e public/hot
+
+# Public UAT: trigger existing PR checks only; no deployment.

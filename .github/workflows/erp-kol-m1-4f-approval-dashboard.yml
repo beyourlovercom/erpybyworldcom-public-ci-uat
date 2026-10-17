@@ -93,3 +93,5 @@ jobs:
           tests/Feature/Identity/UserManagementTest.php
           tests/Feature/AppShellNavigationTest.php
           tests/Feature/ErpNavigationTest.php
+
+# Public UAT: trigger existing PR checks only; no deployment.
