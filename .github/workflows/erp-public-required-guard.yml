@@ -1,0 +1,71 @@
+name: ERP Public Required CI Guard
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-ci-required-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  required-guard:
+    name: public-ci-required-guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout proposed change
+        uses: actions/checkout@v4
+
+      - name: Validate tracked files and synthetic fixtures
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, subprocess, zipfile
+          paths = [pathlib.Path(x.decode()) for x in subprocess.check_output(
+              ["git", "ls-files", "-z"]).split(b"\0") if x]
+          forbidden = [str(p) for p in paths if (
+              (p.name.startswith(".env") and p.name != ".env.example") or
+              p.name in ("id_rsa", "id_ed25519", "credentials.json") or
+              p.suffix.lower() in (".pem", ".p12", ".pfx", ".sqlite", ".sqlite3", ".dump")
+          )]
+          assert not forbidden, "Do not commit local secrets or database files: " + str(forbidden[:10])
+          fixture = pathlib.Path("config/erp_orders.php")
+          assert fixture.is_file() and "demo@example.invalid" in fixture.read_text(), (
+              "Synthetic ERP orders fixture required")
+          for xlsx in [p for p in paths if p.suffix.lower() == ".xlsx"]:
+              with zipfile.ZipFile(xlsx) as workbook:
+                  assert workbook.testzip() is None, "Broken workbook: " + str(xlsx)
+                  for part in workbook.namelist():
+                      if part.endswith((".xml", ".rels")):
+                          contents = workbook.read(part)
+                          assert not re.search(rb"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", contents), (
+                              "Contact mailbox in workbook: " + str(xlsx))
+          print("Required guard: tracked-file, synthetic-fixture, workbook checks PASS")
+          PY
+
+      - name: PHP syntax and workflow syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l config/erp_orders.php
+          if [ -f tests/Feature/AppShellNavigationTest.php ]; then
+            php -l tests/Feature/AppShellNavigationTest.php
+          fi
+          if [ -f tests/Feature/ErpNavigationTest.php ]; then
+            php -l tests/Feature/ErpNavigationTest.php
+          fi
+          ruby -ryaml -e '
+            files = Dir.glob(".github/workflows/*.{yml,yaml}")
+            abort("No CI workflows found") if files.empty?
+            files.each do |file|
+              data = YAML.load_file(file)
+              abort("Missing jobs in #{file}") unless data.is_a?(Hash) && data["jobs"].is_a?(Hash) && !data["jobs"].empty?
+            end
+            puts "Checked #{files.length} workflow YAML files"
+          '
