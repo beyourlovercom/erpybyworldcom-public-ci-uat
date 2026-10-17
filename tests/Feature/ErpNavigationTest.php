@@ -40,10 +40,18 @@ class ErpNavigationTest extends TestCase
         foreach ($this->paths(config('erp_navigation')) as $path) $this->get($path)->assertOk();
     }
 
-    public function test_shell_renders_required_modules_without_affiliate(): void
+    public function test_yby_shell_renders_only_the_approved_four_base_modules(): void
     {
-        $response = $this->get('/logistics/pending');
-        $response->assertInertia(fn (Assert $page) => $page->component('Logistics/Index')->has('shellNavigation', 13));
+        // All the legacy permissions are available to this admin test user,
+        // but the YBY navigation profile still limits visible base modules.
+        $response = $this->get('/dashboard');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard/Index')
+            ->has('shellNavigation', 4)
+            ->where('shellNavigation.0.key', 'dashboard')
+            ->where('shellNavigation.1.key', 'customers')
+            ->where('shellNavigation.2.key', 'products')
+            ->where('shellNavigation.3.key', 'settings'));
     }
 
     public function test_accounting_third_level_navigation_is_rendered(): void
