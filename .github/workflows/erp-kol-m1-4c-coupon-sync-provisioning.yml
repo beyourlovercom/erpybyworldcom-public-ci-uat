@@ -68,3 +68,5 @@ jobs:
           tests/Feature/Kol/KolProvisioningTest.php
           tests/Feature/Kol/HttpAffiliateWpGatewayTest.php
           tests/Feature/Sync/WordPressConnectorSettingsTest.php
+
+# Public UAT: trigger existing PR checks only; no deployment.

@@ -74,6 +74,7 @@ class AppShellNavigationTest extends TestCase
 
     public function test_dashboard_renders_formal_shell_with_safe_shared_props(): void
     {
+
         $user = $this->userWith(['dashboard.view', 'sync.view']);
         $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
             ->component('Dashboard/Index')
@@ -82,45 +83,41 @@ class AppShellNavigationTest extends TestCase
             ->where('auth.user.email', $user->email)
             ->missing('auth.user.password')
             ->missing('auth.user.remember_token')
-            ->has('shellNavigation', 2)
+            ->has('shellNavigation', 1)
             ->where('shellNavigation.0.key', 'dashboard')
-            ->where('shellNavigation.1.key', 'sync'));
+            ->missing('shellNavigation.1'));
     }
 
     public function test_navigation_comes_from_formal_source_and_filters_unauthorized_modules(): void
     {
+
         $user = $this->userWith(['dashboard.view', 'logistics.view']);
-        $response = $this->actingAs($user)->get('/dashboard');
-        $response->assertInertia(fn (Assert $page) => $page
+        $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
+            ->has('shellNavigation', 1)
             ->where('shellNavigation.0.label', '仪表盘')
-            ->where('shellNavigation.1.label', '物流')
-            ->missing('shellNavigation.2'));
+            ->missing('shellNavigation.1'));
         $this->actingAs($user)->get('/sync')->assertForbidden();
         $this->actingAs($user)->get('/settings')->assertForbidden();
     }
 
-    public function test_restored_legacy_children_are_emitted_and_gated_by_their_own_permission(): void
+    public function test_yby_navigation_profile_hides_legacy_logistics_with_or_without_prototype_permission(): void
     {
-        $user = $this->userWith(['dashboard.view', 'logistics.view'], 'operator-without-prototype');
-        $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->has('shellNavigation.1.children', 5)
-            ->where('shellNavigation.1.children.0.key', 'logistics-pending')
-            ->where('shellNavigation.1.children.0.label', '待发货')
-            ->where('shellNavigation.1.children.1.key', 'logistics-awaiting-tracking')
-            ->where('shellNavigation.1.children.1.label', '已发待单号')
-            ->where('shellNavigation.1.children.2.label', '运输中')
-            ->where('shellNavigation.1.children.3.label', '异常订单')
-            ->where('shellNavigation.1.children.4.key', 'logistics-carriers')
-            ->where('shellNavigation.1.children.4.label', '承运商'));
 
-        $withPrototype = $this->userWith(['dashboard.view', 'logistics.view', 'prototype.view'], 'operator-with-prototype');
-        $this->actingAs($withPrototype)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->has('shellNavigation.1.children', 5)
-            ->where('shellNavigation.1.children.1.label', '已发待单号')
-            ->where('shellNavigation.1.children.2.label', '运输中')
-            ->where('shellNavigation.1.children.3.label', '异常订单')
-            ->where('shellNavigation.1.children.4.key', 'logistics-carriers')
-            ->where('shellNavigation.1.children.4.label', '承运商'));
+        // YBY intentionally hides legacy Logistics navigation even when the caller
+        // has legacy logistics and prototype permissions.
+        $user = $this->userWith(['dashboard.view', 'logistics.view'], 'operator-without-prototype');
+        $this->assertSame(
+            ['dashboard'],
+            array_column(app(ErpShellNavigation::class)->for($user), 'key')
+        );
+
+        $withPrototype = $this->userWith(
+            ['dashboard.view', 'logistics.view', 'prototype.view'], 'operator-with-prototype'
+        );
+        $this->assertSame(
+            ['dashboard'],
+            array_column(app(ErpShellNavigation::class)->for($withPrototype), 'key')
+        );
     }
 
     public function test_project_traffic_navigation_exposes_growth_subpages(): void
@@ -156,96 +153,95 @@ class AppShellNavigationTest extends TestCase
         ], collect($traffic['children'])->pluck('label')->all());
     }
 
-    public function test_inventory_navigation_includes_active_warehouse_shortcuts(): void
+    public function test_yby_navigation_hides_legacy_inventory_even_when_warehouse_route_is_authorized(): void
     {
+
         Warehouse::query()->delete();
-        $first = Warehouse::query()->create(['slug' => 'de', 'code' => 'DE', 'name' => '德国仓', 'is_active' => true, 'priority' => 10]);
-        $second = Warehouse::query()->create(['slug' => 'us-east', 'code' => 'USE', 'name' => '美东仓', 'is_active' => true, 'priority' => 20]);
+        Warehouse::query()->create(['slug' => 'de', 'code' => 'DE', 'name' => '德国仓', 'is_active' => true, 'priority' => 10]);
+        Warehouse::query()->create(['slug' => 'us-east', 'code' => 'USE', 'name' => '美东仓', 'is_active' => true, 'priority' => 20]);
         Warehouse::query()->create(['slug' => 'inactive', 'code' => 'OFF', 'name' => '停用仓', 'is_active' => false, 'priority' => 1]);
 
         $user = $this->userWith(['dashboard.view', 'inventory.view']);
         $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->has('shellNavigation.1.children', 6)
-            ->where('shellNavigation.1.key', 'inventory')
-            ->where('shellNavigation.1.children.0.key', 'inventory-overview')
-            ->where('shellNavigation.1.children.1.key', 'inventory-list')
-            ->where('shellNavigation.1.children.2.key', 'inventory-warehouse-'.$first->id)
-            ->where('shellNavigation.1.children.2.label', '德国仓')
-            ->where('shellNavigation.1.children.2.path', '/inventory/de')
-            ->where('shellNavigation.1.children.3.key', 'inventory-warehouse-'.$second->id)
-            ->where('shellNavigation.1.children.3.label', '美东仓')
-            ->where('shellNavigation.1.children.4.key', 'inventory-products')
-            ->where('shellNavigation.1.children.5.key', 'inventory-packaging'));
+            ->has('shellNavigation', 1)
+            ->where('shellNavigation.0.key', 'dashboard')
+            ->missing('shellNavigation.1'));
 
+        // The underlying warehouse route authorization is separate from
+        // the YBY project-specific menu allowlist.
         $this->actingAs($user)->get('/inventory/de')->assertOk();
     }
 
-    public function test_packaging_permission_exposes_inventory_only_through_packaging_child(): void
+    public function test_yby_profile_does_not_expose_legacy_inventory_from_packaging_permission(): void
     {
-        $user = $this->userWith(['dashboard.view', 'inventory.packaging.submit'], 'factory-packaging-menu');
 
+        $user = $this->userWith(['dashboard.view', 'inventory.packaging.submit'], 'factory-packaging-menu');
         $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->has('shellNavigation', 2)
-            ->where('shellNavigation.1.key', 'inventory')
-            ->has('shellNavigation.1.children', 1)
-            ->where('shellNavigation.1.children.0.key', 'inventory-packaging')
-            ->where('shellNavigation.1.children.0.path', '/inventory/packaging'));
+            ->has('shellNavigation', 1)
+            ->where('shellNavigation.0.key', 'dashboard')
+            ->missing('shellNavigation.1'));
     }
 
-    public function test_accounting_navigation_closes_to_overview_and_order_profit(): void
+    public function test_yby_profile_does_not_expose_legacy_accounting_navigation(): void
     {
+
         $user = $this->userWith(['dashboard.view', 'accounting.view', 'analysis.view', 'prototype.view']);
         $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->where('shellNavigation.1.key', 'accounting')
-            ->has('shellNavigation.1.children', 3)
-            ->where('shellNavigation.1.children.0.key', 'accounting-overview')
-            ->where('shellNavigation.1.children.0.path', '/accounting')
-            ->where('shellNavigation.1.children.1.key', 'accounting-order-costs')
-            ->where('shellNavigation.1.children.1.label', '订单利润')
-            ->where('shellNavigation.1.children.1.path', '/accounting/order-costs')
-            ->where('shellNavigation.1.children.2.key', 'accounting-loss-orders')
-            ->where('shellNavigation.1.children.2.label', '亏损订单')
-            ->where('shellNavigation.1.children.2.path', '/accounting/order-costs?profit_status=loss'));
+            ->has('shellNavigation', 1)
+            ->where('shellNavigation.0.key', 'dashboard')
+            ->missing('shellNavigation.1'));
     }
 
-    public function test_customer_import_is_available_from_customer_and_sync_navigation_with_the_same_workspace(): void
+    public function test_yby_customer_import_menu_and_sync_route_share_permission_contract(): void
     {
-        $user = $this->userWith(['dashboard.view', 'sync.view', 'customers.view', 'customers.import', 'system.permissions.manage'], 'customer-import-admin');
 
+        $user = $this->userWith(
+            ['dashboard.view', 'sync.view', 'customers.view', 'customers.import', 'system.permissions.manage'],
+            'customer-import-admin'
+        );
+
+        // The YBY profile keeps Customers > Import, not the legacy Sync menu.
         $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->where('shellNavigation.1.key', 'sync')
-            ->where('shellNavigation.1.children.3.key', 'sync-customers-import')
-            ->where('shellNavigation.1.children.3.path', '/sync/customers/import')
-            ->where('shellNavigation.2.key', 'customers')
-            ->where('shellNavigation.2.children.2.key', 'customers-companies')
-            ->where('shellNavigation.2.children.3.key', 'customers-import')
-            ->where('shellNavigation.2.children.3.path', '/customers/import'));
+            ->has('shellNavigation', 3)
+            ->where('shellNavigation.0.key', 'dashboard')
+            ->where('shellNavigation.1.key', 'customers')
+            ->has('shellNavigation.1.children', 4)
+            ->where('shellNavigation.1.children.2.key', 'customers-companies')
+            ->where('shellNavigation.1.children.3.key', 'customers-import')
+            ->where('shellNavigation.1.children.3.path', '/customers/import')
+            ->where('shellNavigation.2.key', 'settings'));
 
+        // Backend routes retain their independent permission contract.
         $this->actingAs($user)->get('/customers/import')->assertInertia(fn (Assert $page) => $page->component('Customers/Import'));
         $this->actingAs($user)->get('/sync/customers/import')->assertInertia(fn (Assert $page) => $page->component('Customers/Import'));
     }
 
     public function test_customer_import_navigation_requires_both_import_and_permission_admin_gates(): void
     {
-        $withoutAdminGate = $this->userWith(['dashboard.view', 'sync.view', 'customers.view', 'customers.import'], 'customer-import-no-admin');
+
+        $withoutAdminGate = $this->userWith(
+            ['dashboard.view', 'sync.view', 'customers.view', 'customers.import'],
+            'customer-import-no-admin'
+        );
 
         $this->actingAs($withoutAdminGate)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->where('shellNavigation.1.key', 'sync')
-            ->has('shellNavigation.1.children', 4)
-            ->where('shellNavigation.2.key', 'customers')
-            ->has('shellNavigation.2.children', 3)
-            ->where('shellNavigation.2.children.2.key', 'customers-companies'));
+            ->has('shellNavigation', 2)
+            ->where('shellNavigation.0.key', 'dashboard')
+            ->where('shellNavigation.1.key', 'customers')
+            ->has('shellNavigation.1.children', 3)
+            ->where('shellNavigation.1.children.2.key', 'customers-companies'));
 
         $this->actingAs($withoutAdminGate)->get('/customers/import')->assertForbidden();
         $this->actingAs($withoutAdminGate)->get('/sync/customers/import')->assertForbidden();
     }
 
-    public function test_sync_permission_controls_route_and_navigation_item(): void
+    public function test_sync_route_permission_does_not_reintroduce_filtered_yby_sync_navigation(): void
     {
+
         $user = $this->userWith(['sync.view']);
         $this->actingAs($user)->get('/sync')->assertInertia(fn (Assert $page) => $page
             ->component('Sync/Index')
-            ->where('shellNavigation.0.path', '/sync'));
+            ->has('shellNavigation', 0));
     }
 
     public function test_settings_fx_child_menu_is_implemented_with_settings_permission(): void
@@ -321,18 +317,29 @@ class AppShellNavigationTest extends TestCase
         }
     }
 
-    public function test_super_admin_can_access_all_formal_modules(): void
+    public function test_super_admin_still_respects_yby_four_module_navigation_profile(): void
     {
+
         $user = $this->userWith([], 'super_admin');
         $this->actingAs($user)->get('/settings')->assertOk();
-        $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->has('shellNavigation', 13));
+        $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
+            ->has('shellNavigation', 4)
+            ->where('shellNavigation.0.key', 'dashboard')
+            ->where('shellNavigation.1.key', 'customers')
+            ->where('shellNavigation.2.key', 'products')
+            ->where('shellNavigation.3.key', 'settings'));
     }
 
-    public function test_root_contract_and_legacy_prototype_access_remain_unchanged(): void
+    public function test_yby_legacy_prototype_permission_does_not_grant_logistics_access(): void
     {
+
         $user = $this->userWith(['dashboard.view', 'prototype.view']);
         $this->actingAs($user)->get('/')->assertRedirectToRoute('dashboard');
-        $this->actingAs($user)->get('/logistics/pending')->assertOk();
+        $this->actingAs($user)->get('/logistics/pending')->assertForbidden();
+        $this->assertSame(
+            ['dashboard'],
+            array_column(app(ErpShellNavigation::class)->for($user), 'key')
+        );
     }
 
     public function test_kol_orders_surface_requires_the_real_orders_permission_not_prototype(): void

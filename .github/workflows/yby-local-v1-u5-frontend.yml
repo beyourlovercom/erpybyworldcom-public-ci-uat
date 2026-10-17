@@ -26,3 +26,5 @@ jobs:
         run: npm run build
       - name: Diff whitespace check
         run: git diff --check origin/main...HEAD
+
+# Public UAT: trigger existing PR checks only; no deployment.

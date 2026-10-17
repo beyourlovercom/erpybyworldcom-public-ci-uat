@@ -44,3 +44,5 @@ jobs:
         run: vendor/bin/phpunit tests/Unit/Backup tests/Feature/Backup --no-progress
       - name: PR diff whitespace check
         run: git diff --check HEAD^ HEAD
+
+# Public UAT: trigger existing PR checks only; no deployment.
