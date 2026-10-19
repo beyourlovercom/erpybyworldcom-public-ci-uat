@@ -1,0 +1,8 @@
+P7-B ZERO-COST SYNTHETIC CI UAT
+Scope: Public CI-UAT only, synthetic metadata only.
+Required check: public-ci-required-guard.
+All entries in this file are fabricated; no real customer data.
+No private repository source, commit, history, or Notion identifier.
+No API tokens, passwords, emails, postal addresses, or telephone numbers.
+No production deployment, real database access, or payment.
+Owner authorization: synthetic branch and Draft PR only; never merge automatically.
